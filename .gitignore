@@ -1,0 +1,23 @@
+# xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+build/
+DerivedData/
+
+# swift package manager
+.build/
+.swiftpm/
+Packages/
+
+# macos
+.DS_Store
+
+# markdown
+*.md
+
+# agent tooling, not part of the app
+.agents/
+.claude/
+skills-lock.json
