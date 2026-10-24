@@ -7,7 +7,6 @@ final class OnboardingViewModel {
 
     var name: String = ""
 
-    var canContinue: Bool { !trimmed.isEmpty }
     private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
 
     func finish() {

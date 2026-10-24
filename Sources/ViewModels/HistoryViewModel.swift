@@ -1,121 +1,186 @@
+import Foundation
+import Observation
 import SwiftUI
 
 @Observable
 final class HistoryViewModel {
-    private let snaps: SnapStore
-    private let calendar = Calendar.current
-    private let defaults = UserDefaults.standard
+    enum Lens: String, CaseIterable { case week, calendar, month }
 
-    // 0 is this month, 1 the one before it, back as far as the first snap
-    private(set) var monthsBack = 0
-    private(set) var drag: CGFloat = 0
+    private let snaps: SnapStore
+    private let cal = Calendar.current
+
+    var lens: Lens = .week
+    var anchor: Date = .now
     var openDay: Date?
 
     init(snaps: SnapStore) { self.snaps = snaps }
 
-    // MARK: what the screen shows
+    // MARK: headings
 
-    var title: String { monthStart.formatted(.dateTime.month(.wide).year()) }
-    var isEmpty: Bool { snaps.snaps.isEmpty }
-    var total: Int { snaps.snaps.count }
-    var streak: Int { snaps.streak }
-    var canPageBack: Bool { monthsBack < monthsAvailable }
-    var canPageForward: Bool { monthsBack > 0 }
-    var tilt: Double { drag / 60 }
-
-    // the grid asks for a square at a time, so nothing is loaded off screen
-    func cell(at index: Int) -> DayCell? {
-        guard let date = date(at: index) else { return nil }
-        let shots = snaps.snaps(on: date)
-        return DayCell(date: date,
-                       image: shots.first.flatMap { snaps.image(for: $0) },
-                       count: shots.count,
-                       isToday: calendar.isDateInToday(date))
-    }
-
-    // the sheet's model is made here so the view never sees the store
-    func dayModel(for day: Date) -> DayViewModel {
-        DayViewModel(day: day, snaps: snaps)
-    }
-
-    func open(_ cell: DayCell) {
-        guard cell.count > 0 else { return }
-        openDay = cell.date
-    }
-
-    // MARK: months
-
-    private var monthStart: Date {
-        let thisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: .now)) ?? .now
-        return calendar.date(byAdding: .month, value: -monthsBack, to: thisMonth) ?? thisMonth
-    }
-
-    // nothing to look at before the first snap, so that is the floor
-    private var monthsAvailable: Int {
-        guard let oldest = snaps.snaps.map(\.date).min() else { return 0 }
-        let from = calendar.date(from: calendar.dateComponents([.year, .month], from: oldest)) ?? .now
-        let to = calendar.date(from: calendar.dateComponents([.year, .month], from: .now)) ?? .now
-        return max(0, calendar.dateComponents([.month], from: from, to: to).month ?? 0)
-    }
-
-    private func date(at index: Int) -> Date? {
-        let offset = calendar.component(.weekday, from: monthStart) - 1
-        let day = index - offset
-        guard day >= 0,
-              let date = calendar.date(byAdding: .day, value: day, to: monthStart),
-              calendar.isDate(date, equalTo: monthStart, toGranularity: .month) else { return nil }
-        return date
-    }
-
-    // MARK: paging
-
-    // only a clearly sideways drag counts, so the vertical scroll underneath
-    // keeps working
-    func dragChanged(_ translation: CGSize) {
-        guard abs(translation.width) > abs(translation.height) else { return }
-        drag = translation.width
-    }
-
-    func dragEnded(_ translation: CGSize) {
-        let width = translation.width
-        guard abs(width) > abs(translation.height) else { return settle() }
-        // dragging right pulls the earlier month in from the left
-        if width > 80, canPageBack { page(by: 1) }
-        else if width < -80, canPageForward { page(by: -1) }
-        else { settle() }
-    }
-
-    // one peek toward the stack on first open, so the gesture is visible without
-    // being spelled out. stops for good once a month has actually been paged.
-    func hint() async {
-        guard !defaults.bool(forKey: Prefs.pagedMonths), monthsAvailable > 0 else { return }
-        try? await Task.sleep(for: .milliseconds(650))
-        withAnimation(.easeOut(duration: 0.28)) { drag = 26 }
-        try? await Task.sleep(for: .milliseconds(300))
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { drag = 0 }
-    }
-
-    private func settle() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { drag = 0 }
-    }
-
-    // out one way and in from the other, so the month is seen to be replaced
-    private func page(by step: Int) {
-        defaults.set(true, forKey: Prefs.pagedMonths)
-        let away: CGFloat = step > 0 ? 440 : -440
-        withAnimation(.easeOut(duration: 0.18)) { drag = away }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            // the jump to the far side must not animate, or swiftui folds it into
-            // the slide back and the card returns the way it left
-            var jump = Transaction()
-            jump.disablesAnimations = true
-            withTransaction(jump) {
-                monthsBack += step
-                drag = -away
-            }
-            try? await Task.sleep(for: .milliseconds(16))
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.85)) { drag = 0 }
+    var headline: String {
+        switch lens {
+        case .week: "How did this\nweek feel?"
+        case .calendar: "Every day\nhas a place."
+        case .month: "Month\nto month."
         }
     }
+
+    var rangeLabel: String {
+        switch lens {
+        case .week:
+            let days = snaps.snaps(inWeekOf: anchor)
+            guard let a = days.first, let b = days.last else { return "" }
+            return "\(a.formatted(.dateTime.month(.abbreviated).day()))–\(b.formatted(.dateTime.day()))"
+        case .calendar, .month:
+            return anchor.formatted(.dateTime.month(.wide).year())
+        }
+    }
+
+    // MARK: week
+
+    struct WeekRow: Identifiable {
+        let id: Date
+        let date: Date
+        let mood: Mood?
+        let line: String
+        var stamp: String { date.formatted(.dateTime.weekday(.abbreviated).day()) }
+    }
+
+    var week: [WeekRow] {
+        snaps.snaps(inWeekOf: anchor).reversed().map { day in
+            let shots = snaps.snaps(on: day)
+            let first = shots.first
+            return WeekRow(id: day, date: day, mood: first?.moodCase,
+                           line: first?.sentence ?? (shots.isEmpty ? "nothing saved" : "kept without a word"))
+        }
+    }
+
+    // MARK: calendar
+
+    struct Cell: Identifiable {
+        let id: Int
+        let date: Date?
+        let mood: Mood?
+        let saved: Bool
+        let isToday: Bool
+    }
+
+    var grid: [Cell] {
+        guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: anchor))
+        else { return [] }
+        // monday first, which is how the design reads left to right
+        let shift = (cal.component(.weekday, from: monthStart) + 5) % 7
+        return (0..<42).map { index in
+            guard index >= shift,
+                  let date = cal.date(byAdding: .day, value: index - shift, to: monthStart),
+                  cal.isDate(date, equalTo: monthStart, toGranularity: .month)
+            else { return Cell(id: index, date: nil, mood: nil, saved: false, isToday: false) }
+            let shots = snaps.snaps(on: date)
+            return Cell(id: index, date: date, mood: shots.first?.moodCase,
+                        saved: !shots.isEmpty, isToday: cal.isDateInToday(date))
+        }
+    }
+
+    var savedCount: Int { grid.filter(\.saved).count }
+
+    // MARK: month, week by week
+
+    struct Band: Identifiable {
+        let id: String
+        let label: String
+        let note: String
+        let ribbons: [Share]
+    }
+
+    // each week of the month becomes one row of ribbons, widths in proportion
+    // to how much of that week felt each way
+    func bands(for month: Date) -> [Band] {
+        let days = snaps.days(inMonthOf: month)
+        guard !days.isEmpty else { return [] }
+        var bands: [Band] = []
+        for start in stride(from: 0, to: days.count, by: 7) {
+            let slice = Array(days[start ..< min(start + 7, days.count)])
+            var counts: [Mood: Int] = [:]
+            for day in slice {
+                for snap in snaps.snaps(on: day) {
+                    guard let mood = snap.moodCase else { continue }
+                    counts[mood, default: 0] += 1
+                }
+            }
+            let total = counts.values.reduce(0, +)
+            guard total > 0, let first = slice.first, let last = slice.last else { continue }
+            let ribbons = Mood.allCases.compactMap { mood -> Share? in
+                guard let n = counts[mood], n > 0 else { return nil }
+                return Share(id: "\(mood.rawValue)-\(first.timeIntervalSince1970)",
+                             mood: mood, count: n, fraction: Double(n) / Double(total))
+            }
+            let dominant = counts.max { $0.value < $1.value }?.key
+            bands.append(Band(
+                id: "\(first.timeIntervalSince1970)",
+                label: (first.formatted(.dateTime.month(.abbreviated).day()) + "—"
+                        + last.formatted(.dateTime.day())).uppercased(),
+                note: dominant.map { "mostly \($0.rawValue)" } ?? "",
+                ribbons: ribbons))
+        }
+        return bands
+    }
+
+    var monthHeadline: String {
+        let counts = snaps.moodCounts(inMonthOf: anchor)
+        guard let top = counts.max(by: { $0.value < $1.value })?.key else {
+            return "\(monthName(anchor))\nis still open."
+        }
+        return "\(monthName(anchor))\nwas mostly \(top.rawValue)."
+    }
+
+    var compareLabel: String { "Compare with \(monthName(previousMonth))  →" }
+
+    // MARK: month to month
+
+    struct Share: Identifiable {
+        let id: String
+        let mood: Mood
+        let count: Int
+        let fraction: Double
+    }
+
+    func shares(for month: Date) -> [Share] {
+        let counts = snaps.moodCounts(inMonthOf: month)
+        let total = max(counts.values.reduce(0, +), 1)
+        return Mood.allCases.compactMap { mood in
+            guard let n = counts[mood], n > 0 else { return nil }
+            return Share(id: "\(mood.rawValue)-\(month.timeIntervalSince1970)",
+                         mood: mood, count: n, fraction: Double(n) / Double(total))
+        }
+    }
+
+    var previousMonth: Date { cal.date(byAdding: .month, value: -1, to: anchor) ?? anchor }
+    func monthName(_ d: Date) -> String { d.formatted(.dateTime.month(.wide)) }
+
+    // MARK: moving about
+
+    func step(_ months: Int) {
+        guard let next = cal.date(byAdding: .month, value: months, to: anchor) else { return }
+        withAnimation(.easeOut(duration: 0.2)) { anchor = next }
+    }
+
+    func stepWeek(_ weeks: Int) {
+        guard let next = cal.date(byAdding: .weekOfYear, value: weeks, to: anchor) else { return }
+        withAnimation(.easeOut(duration: 0.2)) { anchor = next }
+    }
+
+    func open(_ cell: Cell) {
+        guard cell.saved, let date = cell.date else { return }
+        openDay = date
+    }
+
+    func open(_ row: WeekRow) {
+        guard !snaps.snaps(on: row.date).isEmpty else { return }
+        openDay = row.date
+    }
+
+    func dayModel(for day: Date) -> DayViewModel { DayViewModel(day: day, snaps: snaps) }
+
+    var gapNote: String { "A gap is part of the story, too." }
+    var savedNote: String { "\(savedCount) days saved  ·  1 quiet gap doesn't erase anything" }
 }

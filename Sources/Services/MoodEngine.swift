@@ -5,6 +5,16 @@ import UIKit
 struct MoodReading {
     let mood: Mood
     let sentence: String
+    /// what in the photo pointed at that mood. shown on the explanation screen.
+    let because: String
+}
+
+@Generable
+struct MoodCall {
+    let mood: Mood
+
+    @Guide(description: "One short clause naming what in the photo suggested that mood. Under twelve words. No second person, no advice.")
+    let because: String
 }
 
 enum MoodError: LocalizedError {
@@ -41,13 +51,13 @@ enum MoodEngine {
         let photo = Attachment(cgImage, orientation: image.cgOrientation).label("the photo")
         let session = LanguageModelSession(instructions: instructions)
 
-        // greedy, so one photo always gives the same mood
-        let mood = try await session.respond(
+        // greedy, so one photo always gives the same mood and the same reason
+        let call = try await session.respond(
             to: Prompt {
-                "Which mood fits this photo best?"
+                "Which mood fits this photo best, and what in it says so?"
                 photo
             },
-            generating: Mood.self,
+            generating: MoodCall.self,
             options: GenerationOptions(samplingMode: .greedy)
         ).content
 
@@ -60,9 +70,9 @@ enum MoodEngine {
             }
         ).content.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        print("[moop] mood: \(mood.rawValue)")
+        print("[moop] mood: \(call.mood.rawValue) because \(call.because)")
         print("[moop] sentence: \(sentence)")
-        return MoodReading(mood: mood, sentence: sentence)
+        return MoodReading(mood: call.mood, sentence: sentence, because: call.because)
     }
 }
 
@@ -110,6 +120,7 @@ extension MoodEngine {
         do {
             let reading = try await read(image)
             print("[moop] IMAGE PROBE OK — \(reading.mood.rawValue) / \(reading.sentence)")
+            print("[moop] because — \(reading.because)")
         } catch {
             print("[moop] IMAGE PROBE FAILED — \(error)")
         }

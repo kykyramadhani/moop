@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import UIKit
 
@@ -6,7 +7,8 @@ final class DayViewModel {
     let day: Date
     private let snaps: SnapStore
 
-    var index = 0
+    /// which snap sits in the hero slot. the rest line up underneath.
+    var focused = 0
     var confirmingDelete = false
     private(set) var dismissed = false
 
@@ -16,26 +18,40 @@ final class DayViewModel {
     }
 
     var shots: [Snap] { snaps.snaps(on: day) }
-    var showsDots: Bool { shots.count > 1 }
 
-    var current: Snap? {
+    var hero: Snap? {
         let shots = shots
-        return shots.indices.contains(index) ? shots[index] : shots.first
+        return shots.indices.contains(focused) ? shots[focused] : shots.first
+    }
+
+    var rest: [Snap] {
+        guard let hero else { return [] }
+        return shots.filter { $0.id != hero.id }
+    }
+
+    var title: String {
+        day.formatted(.dateTime.weekday(.wide)) + ",\n" + day.formatted(.dateTime.day().month(.wide))
+    }
+
+    var countLabel: String {
+        let n = shots.count
+        return "\(n) MOMENT\(n == 1 ? "" : "S")"
+    }
+
+    func time(of snap: Snap) -> String {
+        snap.date.formatted(.dateTime.hour().minute())
     }
 
     func image(for snap: Snap) -> UIImage? { snaps.image(for: snap) }
 
-    var dateLine: String {
-        guard let current else { return "" }
-        let stamp = current.date
-            .formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-            .uppercased()
-        return shots.count > 1 ? "\(stamp)  ·  \(index + 1) OF \(shots.count)" : stamp
+    func focus(_ snap: Snap) {
+        guard let i = shots.firstIndex(where: { $0.id == snap.id }) else { return }
+        focused = i
     }
 
     func delete() {
-        guard let current else { return }
-        snaps.remove(current)
-        if shots.isEmpty { dismissed = true } else { index = min(index, shots.count - 1) }
+        guard let hero else { return }
+        snaps.remove(hero)
+        if shots.isEmpty { dismissed = true } else { focused = min(focused, shots.count - 1) }
     }
 }

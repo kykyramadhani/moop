@@ -2,97 +2,106 @@ import SwiftUI
 
 struct DayView: View {
     @State var model: DayViewModel
-    @Environment(\.dismiss) private var dismiss
+    var back: () -> Void
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                // the day is a deck: swipe it. the dots say how deep it goes.
-                TabView(selection: $model.index) {
-                    ForEach(Array(model.shots.enumerated()), id: \.element.id) { position, snap in
-                        photo(snap).tag(position)
-                    }
+            VStack(alignment: .leading, spacing: 0) {
+                Button(action: back) {
+                    Text("‹  your story")
+                        .font(MoopType.detail)
+                        .foregroundStyle(Moop.violet)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 280)
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.cut)
 
-                if model.showsDots { dots }
-                if let current = model.current { caption(current) }
+                Text(model.title)
+                    .font(MoopType.poster)
+                    .foregroundStyle(Moop.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.section)
+
+                Text(model.countLabel)
+                    .font(MoopType.detail)
+                    .foregroundStyle(Moop.ink)
+                    .padding(.horizontal, Space.cut)
+                    .frame(height: 30)
+                    .background(Moop.citrus, in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.beat)
+
+                if let hero = model.hero { heroBlock(hero) }
+                if !model.rest.isEmpty { restRow }
+
+                Spacer(minLength: Space.scene)
             }
-            .padding(.top, 28)
-            .padding(.bottom, 40)
-            .frame(maxWidth: .infinity)
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .animation(.easeOut(duration: 0.2), value: model.index)
-        .overlay(alignment: .topTrailing) { trashButton }
-        .onChange(of: model.dismissed) { _, gone in if gone { dismiss() } }
-        .alert("Delete this snap?", isPresented: $model.confirmingDelete) {
+        .background(Moop.canvas)
+        .alert("Delete this moment?", isPresented: $model.confirmingDelete) {
             Button("Delete", role: .destructive) { model.delete() }
-            Button("Cancel", role: .cancel) {}
+            Button("Keep it", role: .cancel) {}
         } message: {
-            Text("The photo and its moop go for good.")
+            Text("The photo and its word go for good. Everything else from that day stays.")
         }
+        .onChange(of: model.dismissed) { _, gone in if gone { back() } }
     }
 
-    private func photo(_ snap: Snap) -> some View {
-        Group {
-            if let image = model.image(for: snap) {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else {
-                Color.hairline
+    private func heroBlock(_ snap: Snap) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Image(uiImage: model.image(for: snap) ?? UIImage())
+                .resizable().scaledToFill()
+                .frame(height: 208)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: Edge.soft, style: .continuous))
+                .padding(.top, Space.beat)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(snap.moodCase?.rawValue ?? "kept without a word")
+                    .font(MoopType.title)
+                    .foregroundStyle(snap.moodCase == nil ? Moop.ink.opacity(0.55) : Moop.ink)
+                Spacer()
+                HStack(spacing: Space.dot) {
+                    Text(model.time(of: snap))
+                    Text("·")
+                    Button("delete") { model.confirmingDelete = true }
+                }
+                .font(MoopType.detail)
+                .foregroundStyle(Moop.violet)
             }
-        }
-        .frame(width: 280, height: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .frame(maxWidth: .infinity)
-    }
+            .padding(.top, Space.beat)
 
-    private var dots: some View {
-        HStack(spacing: 6) {
-            ForEach(model.shots.indices, id: \.self) { i in
-                Circle()
-                    .fill(Color.inkSecondary)
-                    .opacity(i == model.index ? 1 : 0.3)
-                    .frame(width: 6, height: 6)
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: model.index)
-    }
-
-    private func caption(_ snap: Snap) -> some View {
-        VStack(spacing: 8) {
-            Text(model.dateLine)
-                .font(.overline)
-                .tracking(0.6)
-                .foregroundStyle(Color.inkSecondary)
-            Text(snap.moodCase.display)
-                .font(.displayMood)
-                .tracking(-0.4)
-                .foregroundStyle(snap.moodCase.ink)
             if let sentence = snap.sentence {
                 Text(sentence)
-                    .font(.bodyLarge)
-                    .tracking(-0.4)
-                    .foregroundStyle(Color.inkSecondary)
-                    .multilineTextAlignment(.center)
-                    // however long it runs, show all of it
+                    .font(MoopType.reading)
+                    .foregroundStyle(Moop.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: 300)
+                    .padding(.top, Space.tick)
             }
         }
-        .id(snap.id)
-        .transition(.opacity)
+        .padding(.horizontal, Space.gutter)
     }
 
-    private var trashButton: some View {
-        Button { model.confirmingDelete = true } label: {
-            Image(systemName: "trash")
-                .font(.system(size: 17))
-                .foregroundStyle(Color.danger)
-                .frame(width: 44, height: 44)
+    // the rest of the day sits underneath as a row, smaller, with its own times
+    private var restRow: some View {
+        HStack(alignment: .top, spacing: Space.cut) {
+            ForEach(model.rest) { snap in
+                Button { model.focus(snap) } label: {
+                    VStack(alignment: .leading, spacing: Space.tick) {
+                        Image(uiImage: model.image(for: snap) ?? UIImage())
+                            .resizable().scaledToFill()
+                            .frame(height: 91)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+                        Text("\(model.time(of: snap)) · \(snap.moodCase?.rawValue ?? "no word")")
+                            .font(MoopType.micro)
+                            .foregroundStyle(Moop.ink)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.trailing, 12)
-        .padding(.top, 8)
+        .padding(.horizontal, Space.gutter)
+        .padding(.top, Space.section)
     }
 }

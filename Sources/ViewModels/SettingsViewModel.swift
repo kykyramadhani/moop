@@ -54,6 +54,20 @@ final class SettingsViewModel {
         Calendar.current.date(bySettingHour: reminderHour, minute: 0, second: 0, of: .now) ?? .now
     }
 
+    var timeLabel: String {
+        reminderTime.formatted(.dateTime.hour().minute())
+    }
+
+    var themeLabel: String { label(for: Theme(rawValue: theme) ?? .system) }
+
+    func label(for option: Theme) -> String {
+        switch option {
+        case .system: "Follow iPhone"
+        case .light: "Lilac"
+        case .dark: "Night"
+        }
+    }
+
     func startEditingName() {
         draftName = name
         editingName = true

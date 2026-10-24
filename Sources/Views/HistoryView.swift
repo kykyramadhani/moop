@@ -2,153 +2,207 @@ import SwiftUI
 
 struct HistoryView: View {
     @State var model: HistoryViewModel
-
-    @AppStorage(Prefs.name) private var name = "You"
+    var open: (HistoryRoute) -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(name)
-                    .font(.titleLarge)
-                    .tracking(-0.4)
-                    .foregroundStyle(Color.inkPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                MoopHeader(trailing: model.rangeLabel)
+                    .padding(.top, Space.cut)
 
-                ZStack {
-                    if model.canPageBack { stackEdges(toward: -1) }
-                    if model.canPageForward { stackEdges(toward: 1) }
-                    monthCard
-                        .offset(x: model.drag)
-                        .rotationEffect(.degrees(model.tilt), anchor: .bottom)
+                Text(model.lens == .month ? model.monthHeadline : model.headline)
+                    .font(MoopType.poster)
+                    .foregroundStyle(Moop.ink)
+                    .lineSpacing(-6)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.section)
+
+                lensPicker
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.beat)
+
+                switch model.lens {
+                case .week: weekList
+                case .calendar: calendar
+                case .month: comparison
                 }
-                .gesture(paging)
-                .padding(.horizontal, 20)
-                .padding(.top, 40)
+            }
+            .padding(.bottom, Space.scene)
+        }
+        .background(Moop.canvas)
+        .onChange(of: model.openDay) { _, day in
+            guard let day else { return }
+            model.openDay = nil
+            open(.day(day))
+        }
+    }
 
-                Group {
-                    if model.isEmpty {
-                        Text("Nothing here yet. Today is waiting.")
-                            .font(.bodyDefault)
-                            .foregroundStyle(Color.inkSecondary)
+    private var lensPicker: some View {
+        HStack(spacing: Space.beat) {
+            ForEach(HistoryViewModel.Lens.allCases, id: \.self) { lens in
+                Button { model.lens = lens } label: {
+                    if model.lens == lens {
+                        MoopBadge(text: lens.rawValue)
                     } else {
-                        stats
+                        Text(lens.rawValue.capitalized)
+                            .font(MoopType.detail)
+                            .foregroundStyle(Moop.violet)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 30)
-                .padding(.bottom, 40)
+                .buttonStyle(.plain)
             }
-        }
-        .background(Color.canvas)
-        .sheet(item: $model.openDay) { day in
-            DayView(model: model.dayModel(for: day))
-                .presentationDetents([.height(540), .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.canvas)
-                .presentationCornerRadius(38)
-        }
-        .task { await model.hint() }
-    }
-
-    private var paging: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .onChanged { model.dragChanged($0.translation) }
-            .onEnded { model.dragEnded($0.translation) }
-    }
-
-    // the months before this one sit to the left, which is where a drag to the
-    // right pulls them from
-    private func stackEdges(toward side: CGFloat) -> some View {
-        ForEach([2, 1], id: \.self) { depth in
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.surface)
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.hairline, lineWidth: 1))
-                .padding(.vertical, CGFloat(depth) * 7)
-                .offset(x: side * CGFloat(depth) * 11)
-                .opacity(1 - Double(depth) * 0.28)
+            Spacer()
         }
     }
 
-    private var monthCard: some View {
-        VStack(spacing: 0) {
+    // MARK: week
+
+    private var weekList: some View {
+        VStack(spacing: Space.tick) {
+            ForEach(model.week) { row in
+                Button { model.open(row) } label: {
+                    HStack(spacing: Space.beat) {
+                        Text(row.stamp)
+                            .font(MoopType.detail)
+                            .foregroundStyle(Moop.onAccent)
+                            .frame(width: 54, alignment: .leading)
+                        Text(row.line)
+                            .font(MoopType.reading)
+                            .foregroundStyle(Moop.onAccent)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Space.beat)
+                    .frame(height: 50)
+                    .background(row.mood.map(Moop.emotion) ?? Moop.veil,
+                                in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            Text(model.gapNote)
+                .font(MoopType.detail)
+                .foregroundStyle(Moop.ink.opacity(0.7))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, Space.cut)
+        }
+        .padding(.horizontal, Space.gutter)
+        .padding(.top, Space.beat)
+    }
+
+    // MARK: calendar
+
+    private var calendar: some View {
+        VStack(alignment: .leading, spacing: Space.cut) {
             HStack {
-                Text(model.title)
-                    .font(.labelAction)
-                    .tracking(-0.4)
-                    .foregroundStyle(Color.inkPrimary)
+                Button { model.step(-1) } label: {
+                    Label("Earlier", systemImage: "chevron.left")
+                        .font(MoopType.detail).foregroundStyle(Moop.violet)
+                }
                 Spacer()
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            .background(Color.brandSoft)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7),
-                      spacing: 6) {
-                ForEach(0..<42, id: \.self) { index in
-                    dayCell(at: index)
+                Button { model.step(1) } label: {
+                    Label("Later", systemImage: "chevron.right")
+                        .font(MoopType.detail).foregroundStyle(Moop.violet)
                 }
             }
-            .padding(12)
+            Rectangle().fill(Moop.veil).frame(height: 1)
+
+            HStack(spacing: 0) {
+                ForEach(["M","T","W","T","F","S","S"], id: \.self) { d in
+                    Text(d).font(MoopType.micro)
+                        .foregroundStyle(Moop.violet)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
+                      spacing: Space.beat) {
+                ForEach(model.grid) { cell in
+                    dayCell(cell)
+                }
+            }
+            Rectangle().fill(Moop.veil).frame(height: 1)
+            Text(model.savedNote)
+                .font(MoopType.detail)
+                .foregroundStyle(Moop.ink.opacity(0.75))
         }
-        .background(Color.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.hairline, lineWidth: 1))
+        .padding(.horizontal, Space.gutter)
+        .padding(.top, Space.beat)
     }
 
     @ViewBuilder
-    private func dayCell(at index: Int) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        if let cell = model.cell(at: index) {
-            Group {
-                if let image = cell.image {
-                    Image(uiImage: image).resizable().scaledToFill()
-                        .overlay(alignment: .topTrailing) {
-                            if cell.count > 1 { countBadge(cell.count) }
-                        }
-                } else if cell.isToday {
-                    Color.surface.overlay {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.brandFill)
+    private func dayCell(_ cell: HistoryViewModel.Cell) -> some View {
+        if let date = cell.date {
+            Button { model.open(cell) } label: {
+                VStack(spacing: Space.dot) {
+                    Text("\(Calendar.current.component(.day, from: date))")
+                        .font(MoopType.reading)
+                        .foregroundStyle(Moop.ink)
+                    if let mood = cell.mood {
+                        Circle().fill(Moop.emotion(mood)).frame(width: 7, height: 7)
+                    } else if cell.saved {
+                        Circle().fill(Moop.ink.opacity(0.35)).frame(width: 7, height: 7)
+                    } else {
+                        Text("—").font(MoopType.micro).foregroundStyle(Moop.ink.opacity(0.3))
                     }
-                    .overlay(shape.stroke(Color.brandFill, lineWidth: 2))
-                } else {
-                    Color.hairline.opacity(0.55)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(cell.isToday ? Moop.citrus : .clear,
+                            in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(date.formatted(.dateTime.day().month(.wide)))
+        } else {
+            Color.clear.frame(height: 44)
+        }
+    }
+
+    // MARK: month, week by week
+
+    private var comparison: some View {
+        VStack(alignment: .leading, spacing: Space.section) {
+            ForEach(model.bands(for: model.anchor)) { band in
+                VStack(alignment: .leading, spacing: Space.tick) {
+                    HStack {
+                        Text(band.label)
+                            .font(MoopType.micro)
+                            .foregroundStyle(Moop.ink)
+                        Spacer()
+                        Text(band.note)
+                            .font(MoopType.detail)
+                            .foregroundStyle(Moop.violet)
+                    }
+                    GeometryReader { geo in
+                        HStack(spacing: Space.dot) {
+                            ForEach(band.ribbons) { ribbon in
+                                RoundedRectangle(cornerRadius: Edge.slight, style: .continuous)
+                                    .fill(Moop.emotion(ribbon.mood))
+                                    .frame(width: max(geo.size.width * ribbon.fraction - Space.dot, 12))
+                            }
+                        }
+                    }
+                    .frame(height: 27)
                 }
             }
-            .aspectRatio(1, contentMode: .fill)
-            .clipShape(shape)
-            .onTapGesture { model.open(cell) }
-        } else {
-            Color.clear.aspectRatio(1, contentMode: .fill)
-        }
-    }
 
-    private func countBadge(_ count: Int) -> some View {
-        Text("\(count)")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Color.onDark)
-            .frame(width: 18, height: 18)
-            .background(Color.viewfinder.opacity(0.82), in: Circle())
-            .padding(3)
-    }
-
-    private var stats: some View {
-        HStack(spacing: 8) {
-            Text("\(model.total) snaps")
-                .font(.bodyDefault)
-                .foregroundStyle(Color.inkSecondary)
-            Text("·").font(.bodyDefault).foregroundStyle(Color.inkSecondary)
-            HStack(spacing: 5) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.streakFlame)
-                Text("\(model.streak)-day streak")
-                    .font(.bodyDefault)
-                    .foregroundStyle(Color.streakFlame)
+            if model.bands(for: model.anchor).isEmpty {
+                Text("Nothing saved this month yet.")
+                    .font(MoopType.reading)
+                    .foregroundStyle(Moop.ink.opacity(0.6))
             }
+
+            Button { open(.compare) } label: {
+                Text(model.compareLabel)
+                    .font(MoopType.detail)
+                    .foregroundStyle(Moop.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Space.cut)
+                    .frame(height: 34)
+                    .background(Moop.citrus, in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, Space.gutter)
+        .padding(.top, Space.beat)
     }
 }

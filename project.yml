@@ -25,6 +25,8 @@ targets:
     sources:
       - path: Sources
       - path: Support/Assets.xcassets
+      - path: Support/Fonts
+        buildPhase: resources
       - path: Support/Motion
         buildPhase: resources
     settings:

@@ -4,15 +4,25 @@ import Observation
 final class AppViewModel {
     let snaps = SnapStore()
     let reader = MoodReader()
-    let navigator = Navigator()
 
+    var tab: Tab = .today
+    var todayPath: [TodayRoute] = []
+    var historyPath: [HistoryRoute] = []
+    var showingCamera = false
     var showingSplash = true
 
     func splashFinished() { showingSplash = false }
+    func openCamera() { showingCamera = true }
 
-    // the trigger is one-shot on purpose, so something has to re-arm it. a new
-    // snap is not enough: the app can sit unopened for days, and once the shot
-    // has fired nothing else would ever queue the next.
+    // the camera is a cover over Today. when the read lands, the cover closes
+    // and Today pushes the result, which is where the design puts it.
+    func cameraFinished(read: Bool) {
+        showingCamera = false
+        if read { todayPath = [.result] }
+    }
+
+    func backToToday() { todayPath.removeAll() }
+
     func armReminder(hour: Int, enabled: Bool) {
         ReminderScheduler.refresh(for: snaps, at: hour, enabled: enabled)
     }

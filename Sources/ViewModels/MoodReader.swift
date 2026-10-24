@@ -8,7 +8,7 @@ final class MoodReader {
     enum Phase {
         case idle
         case working
-        case result(Mood, String, UIImage)
+        case result(MoodReading, UIImage)
         case failed(String)
         case unavailable(Block)
     }
@@ -20,8 +20,9 @@ final class MoodReader {
     var isWorking: Bool { if case .working = phase { true } else { false } }
     var isFailed: Bool { if case .failed = phase { true } else { false } }
 
-    var result: (mood: Mood, sentence: String, photo: UIImage)? {
-        if case let .result(mood, sentence, photo) = phase { (mood, sentence, photo) } else { nil }
+    var result: (mood: Mood, sentence: String, because: String, photo: UIImage)? {
+        guard case let .result(reading, photo) = phase else { return nil }
+        return (reading.mood, reading.sentence, reading.because, photo)
     }
 
     var block: Block? {
@@ -59,7 +60,7 @@ final class MoodReader {
         phase = .working
         do {
             let reading = try await MoodEngine.read(image)
-            phase = .result(reading.mood, reading.sentence, image)
+            phase = .result(reading, image)
         } catch {
             print("[moop] failed: \(error)")
             phase = .failed(error.localizedDescription)
@@ -73,9 +74,9 @@ final class MoodReader {
 
     // greedy sampling fixes the mood to the photo, so only the wording can change
     func reword() async -> String? {
-        guard case let .result(mood, _, photo) = phase else { return nil }
+        guard case let .result(reading, photo) = phase else { return nil }
         guard let fresh = try? await MoodEngine.sentence(for: photo) else { return nil }
-        phase = .result(mood, fresh, photo)
+        phase = .result(MoodReading(mood: reading.mood, sentence: fresh, because: reading.because), photo)
         return fresh
     }
 
