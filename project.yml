@@ -17,6 +17,11 @@ packages:
   Lottie:
     url: https://github.com/airbnb/lottie-ios
     from: "4.5.0"
+  # backup and restore read and write plain zip files. the platform can only
+  # write them, so this is the one dependency the feature needs.
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: "0.9.19"
 
 targets:
   moop:
@@ -38,9 +43,13 @@ targets:
         INFOPLIST_FILE: Support/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: Support/moop.entitlements
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
     dependencies:
       - package: Lottie
+      - package: ZIPFoundation
+      - sdk: CloudKit.framework
+      - sdk: AuthenticationServices.framework
       - sdk: FoundationModels.framework
       - sdk: AVFoundation.framework

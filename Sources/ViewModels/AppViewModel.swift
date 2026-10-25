@@ -2,8 +2,15 @@ import Observation
 
 @Observable
 final class AppViewModel {
-    let snaps = SnapStore()
+    let snaps: SnapStore
     let reader = MoodReader()
+    let account: AccountViewModel
+
+    init() {
+        let snaps = SnapStore()
+        self.snaps = snaps
+        account = AccountViewModel(snaps: snaps)
+    }
 
     var tab: Tab = .today
     var todayPath: [TodayRoute] = []

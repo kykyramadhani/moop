@@ -14,7 +14,6 @@ final class SettingsViewModel {
 
     var editingName = false
     var draftName = ""
-    var confirmingWipe = false
     var notificationsBlocked = false
     private var queued: Date?
 
@@ -94,7 +93,6 @@ final class SettingsViewModel {
         queued = await ReminderScheduler.pending()
     }
 
-    func wipe() { snaps.removeAll() }
 
     private func reschedule() {
         ReminderScheduler.refresh(for: snaps, at: reminderHour, enabled: reminderOn)

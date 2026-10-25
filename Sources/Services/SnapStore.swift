@@ -7,15 +7,23 @@ import UIKit
 final class SnapStore {
     private(set) var snaps: [Snap] = []
 
-    private let folder: URL = {
-        let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("snaps", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base
-    }()
+    private let folder: URL
     private var indexURL: URL { folder.appendingPathComponent("index.json") }
 
-    init() { load() }
+    /// set by the cloud layer while sync is on. local mode leaves them nil, so
+    /// nothing here can ever reach iCloud by accident.
+    @ObservationIgnored var didSave: ((UUID) -> Void)?
+    @ObservationIgnored var didRemove: ((UUID) -> Void)?
+
+    // a folder can be passed in so the backup check never touches real photos
+    init(folder: URL? = nil) {
+        self.folder = folder ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("snaps", isDirectory: true)
+        try? FileManager.default.createDirectory(at: self.folder, withIntermediateDirectories: true)
+        load()
+    }
+
+    func photoURL(for snap: Snap) -> URL { folder.appendingPathComponent("\(snap.id).jpg") }
 
     func image(for snap: Snap) -> UIImage? {
         UIImage(contentsOfFile: folder.appendingPathComponent("\(snap.id).jpg").path)
@@ -29,6 +37,7 @@ final class SnapStore {
         }
         snaps.insert(snap, at: 0)
         save()
+        didSave?(snap.id)
     }
 
     // newest first, because the calendar cell shows the latest one
@@ -46,19 +55,69 @@ final class SnapStore {
         snaps[i] = Snap(id: snap.id, date: snap.date, mood: snap.mood,
                         sentence: sentence, because: snap.because)
         save()
+        didSave?(snap.id)
     }
 
     func remove(_ snap: Snap) {
         try? FileManager.default.removeItem(at: folder.appendingPathComponent("\(snap.id).jpg"))
         snaps.removeAll { $0.id == snap.id }
         save()
+        didRemove?(snap.id)
     }
 
     func removeAll() {
+        let ids = snaps.map(\.id)
+        wipeLocal()
+        ids.forEach { didRemove?($0) }
+    }
+
+    /// local only: no hooks, so it never queues a delete for iCloud
+    func wipeLocal() {
         for snap in snaps {
-            try? FileManager.default.removeItem(at: folder.appendingPathComponent("\(snap.id).jpg"))
+            try? FileManager.default.removeItem(at: photoURL(for: snap))
         }
         snaps.removeAll()
+        save()
+    }
+
+    // MARK: restore and cloud. none of these fire the hooks, because what
+    // arrives from a backup or from iCloud is not a local change to echo back.
+
+    /// adds what is new, never touches what is already here. same file twice
+    /// adds nothing the second time.
+    @discardableResult
+    func merge(_ rows: [Snap], photos: URL) -> Int {
+        let have = Set(snaps.map(\.id))
+        var added = 0
+        for row in rows where !have.contains(row.id) {
+            let source = photos.appendingPathComponent("\(row.id).jpg")
+            let target = photoURL(for: row)
+            guard (try? FileManager.default.copyItem(at: source, to: target)) != nil else { continue }
+            snaps.append(row)
+            added += 1
+        }
+        snaps.sort { $0.date > $1.date }
+        if added > 0 { save() }
+        return added
+    }
+
+    func has(_ id: UUID) -> Bool { snaps.contains { $0.id == id } }
+
+    func applyRemote(_ snap: Snap, photo: URL?) {
+        if let i = snaps.firstIndex(where: { $0.id == snap.id }) {
+            snaps[i] = snap
+        } else if let photo,
+                  (try? FileManager.default.copyItem(at: photo, to: photoURL(for: snap))) != nil {
+            snaps.append(snap)
+            snaps.sort { $0.date > $1.date }
+        } else { return }
+        save()
+    }
+
+    func applyRemoteDelete(_ id: UUID) {
+        guard let snap = snaps.first(where: { $0.id == id }) else { return }
+        try? FileManager.default.removeItem(at: photoURL(for: snap))
+        snaps.removeAll { $0.id == id }
         save()
     }
 

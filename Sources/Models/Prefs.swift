@@ -5,4 +5,6 @@ enum Prefs {
     static let reminderOn = "moop.reminder"
     static let reminderHour = "moop.reminderHour"
     static let pagedMonths = "moop.pagedMonths"
+    static let storageMode = "moop.storageMode"
+    static let syncEnabled = "moop.syncEnabled"
 }

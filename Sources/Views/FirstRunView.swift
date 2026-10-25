@@ -17,7 +17,7 @@ struct FirstRunView: View {
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, Space.section)
 
-            Text("One photo a day. moop gives it a word. No account, no feed, and it never leaves this iPhone.")
+            Text("One photo a day. moop gives it a word. No feed, no posting, and the reading happens on this iPhone.")
                 .font(MoopType.reading)
                 .foregroundStyle(Moop.ink.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)

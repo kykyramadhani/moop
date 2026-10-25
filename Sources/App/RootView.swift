@@ -13,6 +13,8 @@ struct RootView: View {
         Group {
             if app.showingSplash {
                 SplashView { withAnimation(.easeOut(duration: 0.25)) { app.splashFinished() } }
+            } else if !app.account.chosen {
+                StorageChoiceView(model: app.account)
             } else if !onboarded {
                 FirstRunView { onboarded = true }
             } else {
@@ -21,8 +23,10 @@ struct RootView: View {
         }
         .preferredColorScheme(Theme(rawValue: theme)?.scheme)
         .onChange(of: app.snaps.snaps.count) { _, _ in arm() }
-        .onChange(of: phase) { _, new in if new == .active { arm() } }
-        .task { arm() }
+        .onChange(of: phase) { _, new in
+            if new == .active { arm(); Task { await app.account.refresh() } }
+        }
+        .task { arm(); await app.account.refresh() }
     }
 
     // the tab bar sits under every screen, pushes included, which is how the
@@ -34,7 +38,7 @@ struct RootView: View {
                 switch app.tab {
                 case .today:    todayTab
                 case .history:  historyTab
-                case .settings: SettingsView(model: SettingsViewModel(snaps: app.snaps))
+                case .settings: SettingsView(model: SettingsViewModel(snaps: app.snaps), account: app.account)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
