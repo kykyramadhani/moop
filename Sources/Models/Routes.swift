@@ -8,5 +8,6 @@ enum TodayRoute: Hashable {
 
 enum HistoryRoute: Hashable {
     case day(Date)
-    case compare
+    /// carries the month you were looking at, so compare lines up with it
+    case compare(Date)
 }

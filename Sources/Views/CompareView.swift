@@ -2,19 +2,17 @@ import SwiftUI
 
 struct CompareView: View {
     @State var model: HistoryViewModel
+    var back: () -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("moop.").font(MoopType.title).foregroundStyle(Moop.ink)
-                    Spacer()
-                    Text("YOUR YEAR")
-                        .font(MoopType.detail)
-                        .foregroundStyle(Moop.ink.opacity(0.75))
-                }
-                .padding(.horizontal, Space.gutter)
-                .padding(.top, Space.cut)
+                MoopHeader(trailing: "your year")
+                    .padding(.top, Space.cut)
+
+                MoopBack(label: "your story", action: back)
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.tick)
 
                 Text("Not the same\nkind of month.")
                     .font(MoopType.poster)
@@ -24,8 +22,8 @@ struct CompareView: View {
                     .padding(.top, Space.section)
 
                 HStack(spacing: Space.section) {
-                    tag(model.monthName(model.previousMonth), tint: Moop.veil)
-                    tag(model.monthName(model.anchor), tint: Moop.citrus)
+                    tag(model.monthName(model.previousMonth), tint: Moop.veil, on: Moop.ink)
+                    tag(model.monthName(model.anchor), tint: Moop.citrus, on: Moop.onAccent)
                 }
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, Space.section)
@@ -55,10 +53,10 @@ struct CompareView: View {
         .background(Moop.canvas)
     }
 
-    private func tag(_ text: String, tint: Color) -> some View {
+    private func tag(_ text: String, tint: Color, on ink: Color) -> some View {
         Text(text.uppercased())
             .font(MoopType.detail)
-            .foregroundStyle(Moop.ink)
+            .foregroundStyle(ink)
             .frame(width: 140, height: 31)
             .background(tint, in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
     }

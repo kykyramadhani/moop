@@ -23,6 +23,11 @@ final class AppViewModel {
 
     func backToToday() { todayPath.removeAll() }
 
+    // removeLast on an empty path would trap, and a back button can always be
+    // hit twice before the push animation lands.
+    func popToday() { if !todayPath.isEmpty { todayPath.removeLast() } }
+    func popHistory() { if !historyPath.isEmpty { historyPath.removeLast() } }
+
     func armReminder(hour: Int, enabled: Bool) {
         ReminderScheduler.refresh(for: snaps, at: hour, enabled: enabled)
     }

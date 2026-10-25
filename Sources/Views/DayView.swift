@@ -6,36 +6,34 @@ struct DayView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Button(action: back) {
-                    Text("‹  your story")
-                        .font(MoopType.detail)
-                        .foregroundStyle(Moop.violet)
-                }
-                .padding(.horizontal, Space.gutter)
-                .padding(.top, Space.cut)
+            LazyVStack(alignment: .leading, spacing: 0) {
+                MoopHeader(trailing: model.countLabel)
+                    .padding(.top, Space.cut)
+
+                MoopBack(label: "your story", action: back)
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, Space.tick)
 
                 Text(model.title)
                     .font(MoopType.poster)
                     .foregroundStyle(Moop.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, Space.gutter)
-                    .padding(.top, Space.section)
-
-                Text(model.countLabel)
-                    .font(MoopType.detail)
-                    .foregroundStyle(Moop.ink)
-                    .padding(.horizontal, Space.cut)
-                    .frame(height: 30)
-                    .background(Moop.citrus, in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
-                    .padding(.horizontal, Space.gutter)
                     .padding(.top, Space.beat)
 
-                if let hero = model.hero { heroBlock(hero) }
-                if !model.rest.isEmpty { restRow }
-
-                Spacer(minLength: Space.scene)
+                if model.isEmpty {
+                    empty
+                } else {
+                    ForEach(model.shots) { snap in
+                        moment(snap)
+                            .padding(.horizontal, Space.gutter)
+                            .padding(.top, Space.section)
+                    }
+                }
             }
+            // a whole day can be ten photos. the last one gets room to breathe
+            // above the tab bar rather than sitting on it.
+            .padding(.bottom, Space.scene)
         }
         .background(Moop.canvas)
         .alert("Delete this moment?", isPresented: $model.confirmingDelete) {
@@ -47,29 +45,21 @@ struct DayView: View {
         .onChange(of: model.dismissed) { _, gone in if gone { back() } }
     }
 
-    private func heroBlock(_ snap: Snap) -> some View {
+    private func moment(_ snap: Snap) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Image(uiImage: model.image(for: snap) ?? UIImage())
-                .resizable().scaledToFill()
-                .frame(height: 208)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: Edge.soft, style: .continuous))
-                .padding(.top, Space.beat)
+            PhotoCard(image: model.image(for: snap))
 
             HStack(alignment: .firstTextBaseline) {
-                Text(snap.moodCase?.rawValue ?? "kept without a word")
+                Text(model.mood(of: snap))
                     .font(MoopType.title)
-                    .foregroundStyle(snap.moodCase == nil ? Moop.ink.opacity(0.55) : Moop.ink)
+                    .foregroundStyle(snap.isLabelled ? Moop.ink : Moop.ink.opacity(0.55))
                 Spacer()
-                HStack(spacing: Space.dot) {
-                    Text(model.time(of: snap))
-                    Text("·")
-                    Button("delete") { model.confirmingDelete = true }
-                }
-                .font(MoopType.detail)
-                .foregroundStyle(Moop.violet)
+                Text(model.time(of: snap))
+                    .font(MoopType.detail)
+                    .foregroundStyle(Moop.ink.opacity(0.7))
+                MoopTrash(what: "the \(model.time(of: snap)) moment") { model.ask(snap) }
             }
-            .padding(.top, Space.beat)
+            .padding(.top, Space.cut)
 
             if let sentence = snap.sentence {
                 Text(sentence)
@@ -79,27 +69,16 @@ struct DayView: View {
                     .padding(.top, Space.tick)
             }
         }
-        .padding(.horizontal, Space.gutter)
     }
 
-    // the rest of the day sits underneath as a row, smaller, with its own times
-    private var restRow: some View {
-        HStack(alignment: .top, spacing: Space.cut) {
-            ForEach(model.rest) { snap in
-                Button { model.focus(snap) } label: {
-                    VStack(alignment: .leading, spacing: Space.tick) {
-                        Image(uiImage: model.image(for: snap) ?? UIImage())
-                            .resizable().scaledToFill()
-                            .frame(height: 91)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
-                        Text("\(model.time(of: snap)) · \(snap.moodCase?.rawValue ?? "no word")")
-                            .font(MoopType.micro)
-                            .foregroundStyle(Moop.ink)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
+    private var empty: some View {
+        VStack(alignment: .leading, spacing: Space.cut) {
+            Text("Nothing was saved on this day.")
+                .font(MoopType.statement)
+                .foregroundStyle(Moop.ink)
+            Text("A gap is part of the story, too.")
+                .font(MoopType.reading)
+                .foregroundStyle(Moop.ink.opacity(0.7))
         }
         .padding(.horizontal, Space.gutter)
         .padding(.top, Space.section)

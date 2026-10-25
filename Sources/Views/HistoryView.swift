@@ -65,11 +65,11 @@ struct HistoryView: View {
                     HStack(spacing: Space.beat) {
                         Text(row.stamp)
                             .font(MoopType.detail)
-                            .foregroundStyle(Moop.onAccent)
+                            .foregroundStyle(row.mood == nil ? Moop.ink : Moop.onAccent)
                             .frame(width: 54, alignment: .leading)
                         Text(row.line)
                             .font(MoopType.reading)
-                            .foregroundStyle(Moop.onAccent)
+                            .foregroundStyle(row.mood == nil ? Moop.ink.opacity(0.7) : Moop.onAccent)
                             .lineLimit(1)
                         Spacer()
                     }
@@ -96,14 +96,26 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: Space.cut) {
             HStack {
                 Button { model.step(-1) } label: {
-                    Label("Earlier", systemImage: "chevron.left")
-                        .font(MoopType.detail).foregroundStyle(Moop.violet)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Moop.violet)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Earlier month")
+                Spacer()
+                Text(model.monthLabel)
+                    .font(MoopType.statement)
+                    .foregroundStyle(Moop.ink)
                 Spacer()
                 Button { model.step(1) } label: {
-                    Label("Later", systemImage: "chevron.right")
-                        .font(MoopType.detail).foregroundStyle(Moop.violet)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Moop.violet)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Later month")
             }
             Rectangle().fill(Moop.veil).frame(height: 1)
 
@@ -136,13 +148,15 @@ struct HistoryView: View {
                 VStack(spacing: Space.dot) {
                     Text("\(Calendar.current.component(.day, from: date))")
                         .font(MoopType.reading)
-                        .foregroundStyle(Moop.ink)
+                        .foregroundStyle(cell.isToday ? Moop.onAccent : Moop.ink)
                     if let mood = cell.mood {
                         Circle().fill(Moop.emotion(mood)).frame(width: 7, height: 7)
                     } else if cell.saved {
-                        Circle().fill(Moop.ink.opacity(0.35)).frame(width: 7, height: 7)
+                        Circle().fill(cell.isToday ? Moop.onAccent.opacity(0.5) : Moop.ink.opacity(0.35))
+                            .frame(width: 7, height: 7)
                     } else {
-                        Text("—").font(MoopType.micro).foregroundStyle(Moop.ink.opacity(0.3))
+                        Text("—").font(MoopType.micro)
+                            .foregroundStyle((cell.isToday ? Moop.onAccent : Moop.ink).opacity(0.35))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -151,7 +165,9 @@ struct HistoryView: View {
                             in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(date.formatted(.dateTime.day().month(.wide)))
+            .disabled(!cell.saved)
+            .accessibilityLabel(date.formatted(.dateTime.day().month(.wide))
+                                + (cell.saved ? ", saved" : ", nothing saved"))
         } else {
             Color.clear.frame(height: 44)
         }
@@ -191,16 +207,24 @@ struct HistoryView: View {
                     .foregroundStyle(Moop.ink.opacity(0.6))
             }
 
-            Button { open(.compare) } label: {
-                Text(model.compareLabel)
+            if model.canCompare {
+                Button { open(.compare(model.anchor)) } label: {
+                    Text(model.compareLabel)
+                        .font(MoopType.detail)
+                        .foregroundStyle(Moop.onAccent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Space.cut)
+                        .frame(height: 44)
+                        .background(Moop.citrus,
+                                    in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(model.compareNote)
                     .font(MoopType.detail)
-                    .foregroundStyle(Moop.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Space.cut)
-                    .frame(height: 34)
-                    .background(Moop.citrus, in: RoundedRectangle(cornerRadius: Edge.slight, style: .continuous))
+                    .foregroundStyle(Moop.ink.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, Space.gutter)
         .padding(.top, Space.beat)

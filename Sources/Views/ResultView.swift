@@ -19,16 +19,12 @@ struct ResultView: View {
     }
 
     private var read: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("moop.").font(MoopType.title).foregroundStyle(Moop.ink)
-                Spacer()
-                Text("SAVED · \(Date.now.formatted(.dateTime.day().month(.abbreviated)).uppercased())")
-                    .font(MoopType.detail)
-                    .foregroundStyle(Moop.ink.opacity(0.7))
-            }
-            .padding(.horizontal, Space.gutter)
-            .padding(.top, Space.scene)
+        // a square photo needs its width to decide its height. a spacer-driven
+        // column hands it the leftover height instead and shrinks it.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+            MoopHeader(trailing: "saved · " + Date.now.formatted(.dateTime.day().month(.abbreviated)))
+                .padding(.top, Space.cut)
 
             Text("This one felt…")
                 .font(MoopType.poster)
@@ -36,15 +32,15 @@ struct ResultView: View {
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, Space.beat)
 
-            HStack(alignment: .top, spacing: 14) {
-                Image(uiImage: model.photo ?? UIImage())
-                    .resizable().scaledToFill()
-                    .frame(width: 206, height: 283)
-                    .clipShape(RoundedRectangle(cornerRadius: Edge.soft, style: .continuous))
-                moodCard.frame(width: 130, height: 283)
-            }
-            .padding(.horizontal, Space.gutter)
-            .padding(.top, Space.beat)
+            // the photo takes the full width as a square and the word sits
+            // under it, so nothing is left standing in an empty column
+            PhotoCard(image: model.photo)
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.beat)
+
+            moodCard
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.cut)
 
             if let sentence = model.sentence {
                 Text("“\(sentence)”")
@@ -74,38 +70,41 @@ struct ResultView: View {
             .padding(.horizontal, Space.gutter)
             .padding(.top, Space.beat)
 
-            Spacer()
-
             MoopAction(title: "keep this snap", action: done)
                 .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.section)
                 .padding(.bottom, Space.scene)
+            }
         }
         .background(Moop.canvas)
     }
 
     private var moodCard: some View {
-        VStack(alignment: .leading, spacing: Space.cut) {
-            Text(model.position.uppercased())
-                .font(MoopType.micro)
-                .foregroundStyle(Moop.onAccent.opacity(0.7))
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: Space.dot) {
+                Text(model.position.uppercased())
+                    .font(MoopType.micro)
+                    .foregroundStyle(Moop.onAccent.opacity(0.7))
+                Text(model.mood?.rawValue ?? "")
+                    .font(MoopType.moodWord)
+                    .foregroundStyle(Moop.onAccent)
+            }
             Spacer()
-            Text(model.mood?.rawValue ?? "")
-                .font(MoopType.moodWord)
-                .foregroundStyle(Moop.onAccent)
             // the reader is a suggestion and the screen says so, every time
             Text("a guess,\nnot a verdict")
                 .font(MoopType.detail)
-                .foregroundStyle(Moop.onAccent.opacity(0.75))
-            Spacer()
+                .foregroundStyle(Moop.onAccent.opacity(0.8))
+                .multilineTextAlignment(.trailing)
         }
-        .padding(Space.cut)
+        .padding(Space.beat)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(model.mood.map(Moop.emotion) ?? Moop.citrus,
                     in: RoundedRectangle(cornerRadius: Edge.soft, style: .continuous))
     }
 
     private var unsure: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text("moop.").font(MoopType.title).foregroundStyle(Moop.onDark)
                 Spacer()
@@ -124,13 +123,9 @@ struct ResultView: View {
                 .padding(.top, Space.section)
 
             if let photo = model.photo {
-                Image(uiImage: photo)
-                    .resizable().scaledToFill()
-                    .frame(height: 222)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: Edge.soft, style: .continuous))
+                PhotoCard(image: photo)
                     .padding(.horizontal, Space.gutter)
-                    .padding(.top, Space.section)
+                    .padding(.top, Space.beat)
             }
 
             Text("READ FAILED · MYSTERY")
@@ -150,10 +145,9 @@ struct ResultView: View {
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, Space.beat)
 
-            Spacer()
-
             MoopAction(title: "try reading again") { Task { await model.retry() } }
                 .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.section)
 
             Button("Keep the photo without a mood") {
                 keepWithout()
@@ -164,6 +158,7 @@ struct ResultView: View {
             .padding(.horizontal, Space.gutter)
             .padding(.top, Space.beat)
             .padding(.bottom, Space.scene)
+            }
         }
         .background(Moop.scene.ignoresSafeArea())
         .preferredColorScheme(.dark)

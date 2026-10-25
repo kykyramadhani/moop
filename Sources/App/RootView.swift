@@ -64,7 +64,8 @@ struct RootView: View {
                 .navigationDestination(for: TodayRoute.self) { route in
                     switch route {
                     case .streak:
-                        StreakView(model: StreakViewModel(snaps: app.snaps))
+                        StreakView(model: StreakViewModel(snaps: app.snaps),
+                                   back: app.popToday)
                             .navigationBarHidden(true)
                     case .result:
                         ResultView(model: ResultViewModel(reader: app.reader, snaps: app.snaps),
@@ -88,10 +89,11 @@ struct RootView: View {
                     switch route {
                     case .day(let date):
                         DayView(model: DayViewModel(day: date, snaps: app.snaps),
-                                back: { app.historyPath.removeLast() })
+                                back: app.popHistory)
                             .navigationBarHidden(true)
-                    case .compare:
-                        CompareView(model: HistoryViewModel(snaps: app.snaps))
+                    case .compare(let month):
+                        CompareView(model: HistoryViewModel(snaps: app.snaps, anchor: month),
+                                    back: app.popHistory)
                             .navigationBarHidden(true)
                     }
                 }

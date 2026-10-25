@@ -13,7 +13,10 @@ final class HistoryViewModel {
     var anchor: Date = .now
     var openDay: Date?
 
-    init(snaps: SnapStore) { self.snaps = snaps }
+    init(snaps: SnapStore, anchor: Date = .now) {
+        self.snaps = snaps
+        self.anchor = anchor
+    }
 
     // MARK: headings
 
@@ -70,7 +73,9 @@ final class HistoryViewModel {
         else { return [] }
         // monday first, which is how the design reads left to right
         let shift = (cal.component(.weekday, from: monthStart) + 5) % 7
-        return (0..<42).map { index in
+        let days = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 30
+        let slots = Int(ceil(Double(shift + days) / 7)) * 7
+        return (0..<slots).map { index in
             guard index >= shift,
                   let date = cal.date(byAdding: .day, value: index - shift, to: monthStart),
                   cal.isDate(date, equalTo: monthStart, toGranularity: .month)
@@ -182,5 +187,33 @@ final class HistoryViewModel {
     func dayModel(for day: Date) -> DayViewModel { DayViewModel(day: day, snaps: snaps) }
 
     var gapNote: String { "A gap is part of the story, too." }
-    var savedNote: String { "\(savedCount) days saved  ·  1 quiet gap doesn't erase anything" }
+
+    // counted, never guessed. an empty month says so rather than reading zero.
+    var savedNote: String {
+        let days = savedCount
+        guard days > 0 else { return "Nothing saved in \(monthName(anchor)) yet." }
+        let gaps = monthLength - days
+        let gapPart = gaps == 0 ? "every day of the month" : "\(gaps) quiet \(gaps == 1 ? "day" : "days")"
+        return "\(days) \(days == 1 ? "day" : "days") saved  ·  \(gapPart)"
+    }
+
+    var monthLabel: String { anchor.formatted(.dateTime.month(.wide).year()) }
+
+    private var monthLength: Int {
+        cal.range(of: .day, in: .month, for: anchor)?.count ?? 30
+    }
+
+    // compare needs two months with something in them, otherwise the bars
+    // would be drawn from nothing.
+    var canCompare: Bool {
+        !snaps.moodCounts(inMonthOf: anchor).isEmpty
+            && !snaps.moodCounts(inMonthOf: previousMonth).isEmpty
+    }
+
+    var compareNote: String {
+        if snaps.moodCounts(inMonthOf: anchor).isEmpty {
+            return "Save a moment this month to compare it with \(monthName(previousMonth))."
+        }
+        return "Nothing was saved in \(monthName(previousMonth)), so there is nothing to compare against."
+    }
 }

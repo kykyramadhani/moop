@@ -2,19 +2,17 @@ import SwiftUI
 
 struct StreakView: View {
     @State var model: StreakViewModel
+    var back: () -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("moop.").font(MoopType.title).foregroundStyle(Moop.ink)
-                Spacer()
-                Text("YOUR RHYTHM")
-                    .font(MoopType.detail)
-                    .foregroundStyle(Moop.ink.opacity(0.75))
-            }
-            .padding(.horizontal, Space.gutter)
-            .padding(.top, Space.cut)
+            MoopHeader(trailing: "your rhythm")
+                .padding(.top, Space.cut)
+
+            MoopBack(label: "today", action: back)
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.tick)
 
             Text(model.headline)
                 .font(MoopType.poster)
@@ -56,15 +54,15 @@ struct StreakView: View {
             HStack(alignment: .firstTextBaseline, spacing: Space.beat) {
                 Text("\(model.count)")
                     .font(MoopType.poster)
-                    .foregroundStyle(Moop.ink)
+                    .foregroundStyle(Moop.onAccent)
                 Text("day streak")
                     .font(MoopType.title)
-                    .foregroundStyle(Moop.ink)
+                    .foregroundStyle(Moop.onAccent)
             }
             Spacer()
             Text(model.reassurance)
                 .font(MoopType.statement)
-                .foregroundStyle(Moop.ink)
+                .foregroundStyle(Moop.onAccent)
         }
         .padding(Space.beat)
         .frame(maxWidth: .infinity, minHeight: 188, alignment: .leading)
@@ -76,7 +74,7 @@ struct StreakView: View {
             ForEach(model.week) { day in
                 Text(day.letter)
                     .font(MoopType.detail)
-                    .foregroundStyle(day.saved || day.isToday ? Moop.onDark : Moop.ink)
+                    .foregroundStyle(letterColour(day))
                     .frame(width: 38, height: 38)
                     .background(fill(day), in: Circle())
                     .accessibilityLabel("\(day.letter), \(day.saved ? "saved" : "nothing saved")")
@@ -87,5 +85,11 @@ struct StreakView: View {
     private func fill(_ day: StreakViewModel.Day) -> Color {
         if day.isToday { return Moop.citrus }
         return day.saved ? Moop.violet : Moop.veil
+    }
+
+    // lime is a light colour in both themes, so its letter stays dark
+    private func letterColour(_ day: StreakViewModel.Day) -> Color {
+        if day.isToday { return Moop.onAccent }
+        return day.saved ? Moop.onViolet : Moop.ink
     }
 }

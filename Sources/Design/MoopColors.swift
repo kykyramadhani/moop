@@ -19,6 +19,8 @@ enum Moop {
     static let ink        = Color(day: 0x171D48, night: 0xF0EDFF)
     static let onDark     = Color(day: 0xEDE9FF, night: 0xF0EDFF)
     static let onAccent   = Color(day: 0x18205A, night: 0x18205A)
+    // violet is deep by day and pale by night, so what sits on it has to flip
+    static let onViolet   = Color(day: 0xF0EDFF, night: 0x18205A)
 
     static let violet     = Color(day: 0x6745CA, night: 0xBCADFF)
     static let blue       = Color(day: 0x3154CF, night: 0x89A3FF)
