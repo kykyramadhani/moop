@@ -1,0 +1,31 @@
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/700.css';
+@import '@fontsource/instrument-serif/400.css';
+@import 'tailwindcss';
+
+/* the same tokens the app uses, in light only: the design has no night mode */
+@theme {
+  --color-canvas: #ede9ff;
+  --color-ink: #171d48;
+  --color-violet: #6745ca;
+  --color-veil: #dcd5fa;
+  --color-night: #29336e;
+  --color-citrus: #c6f36b;
+  --color-highlight: #f9f6ff;
+  --color-homey: #efaa8d;
+  --color-calm: #b4c9ef;
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+a:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 3px; border-radius: 4px; }
